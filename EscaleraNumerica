@@ -1,0 +1,59 @@
+// Earl Michael Frese Garcia 9941/23/19944
+
+
+import java.util.Scanner;
+
+public class EscaleraNumerica {
+
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+
+        // aquí el usuario debe ingresar un número
+        System.out.print("Ingrese el número de niveles: ");
+        int niveles = scanner.nextInt();
+
+        // se debe verificar que sea mayor o igual a 1
+        if (niveles < 1) {
+            System.out.println("Error: el número debe ser mayor o igual a 1.");
+        } else {
+            //el procedimiento debe imprimir la parte ascendente
+            imprimirAscendente(niveles);
+
+            imprimirDescendenteRecursivo(niveles - 1);
+        }
+
+        scanner.close(); // Cerramos el scanner
+    }
+
+    // este rocedimiento que imprime la parte ascendente
+    public static void imprimirAscendente(int niveles) {
+        for (int i = 1; i <= niveles; i++) {
+            imprimirLinea(i); // Imprimimos la línea normal con números
+        }
+    }
+
+
+    public static void imprimirDescendenteRecursivo(int nivel) {
+        if (nivel < 1) {
+            return; // Caso base: si ya llegamos al 0, terminamos
+        }
+        imprimirLinea(nivel); // Imprimimos la línea actual
+        imprimirDescendenteRecursivo(nivel - 1); // Llamada recursiva
+    }
+
+    // Método sobrecargado 1: imprime una línea con números
+    public static void imprimirLinea(int nivel) {
+        for (int i = 1; i <= nivel; i++) {
+            System.out.print(i + " ");
+        }
+        System.out.println(); // Salto de línea
+    }
+
+    // Método sobrecargado 2: imprime una línea con caracteres (como '*')
+    public static void imprimirLinea(int nivel, char simbolo) {
+        for (int i = 1; i <= nivel; i++) {
+            System.out.print(simbolo + " ");
+        }
+        System.out.println(); // Salto de línea
+    }
+}
