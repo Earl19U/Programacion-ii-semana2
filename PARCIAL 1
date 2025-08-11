@@ -1,1 +1,111 @@
 
+//Earl Michael Frese Garcia 9941/23/19944
+
+import java.util.Scanner;
+
+public class ControlTemperaturas {
+
+    static final int DIAS_SEMANA = 7;
+    static double[] temperaturas = new double[DIAS_SEMANA]; //con este arreglo guardo las temperaturas
+    static boolean datosIngresados = false;
+    static String[] dias = {
+            "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"
+    };
+
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        int opcion;
+
+        do {
+            //con este menu el usuario debe elegir que hacer
+            System.out.println("\n--- Menú de Opciones ---");
+            System.out.println("1. Ingresar temperaturas");
+            System.out.println("2. Mostrar todas las temperaturas");
+            System.out.println("3. Mostrar temperatura máxima");
+            System.out.println("4. Mostrar suma total de temperaturas (recursivo)");
+            System.out.println("5. Salir");
+            System.out.print("Seleccione una opción: ");
+            opcion = scanner.nextInt();
+
+            switch (opcion) {
+                case 1:
+                    ingresarTemperaturas(scanner);
+                    break;
+                case 2:
+                    if (datosIngresados) {
+                        mostrarTemperaturas();
+                    } else {
+                        System.out.println("Primero debe ingresar las temperaturas.");
+                    }
+                    break;
+                case 3:
+                    if (datosIngresados) {
+                        int indiceMax = obtenerIndiceTemperaturaMaxima(temperaturas);
+                        mostrarMaxima(temperaturas[indiceMax]);
+                        mostrarMaxima(temperaturas[indiceMax], dias[indiceMax]);
+                    } else {
+                        System.out.println("Primero debe ingresar las temperaturas.");
+                    }
+                    break;
+                case 4:
+                    if (datosIngresados) {
+                        double sumaTotal = sumaTemperaturasRecursiva(temperaturas, 0);
+                        System.out.println("Suma total de temperaturas (recursiva): " + sumaTotal + " °C");
+                    } else {
+                        System.out.println("Primero debe ingresar las temperaturas.");
+                    }
+                    break;
+                case 5:
+                    System.out.println("Saliendo del programa...");
+                    break;
+                default:
+                    System.out.println("Opción no válida.");
+            }
+        } while (opcion != 5);
+
+        scanner.close();
+    }
+
+    public static void ingresarTemperaturas(Scanner scanner) {
+        for (int i = 0; i < DIAS_SEMANA; i++) {
+            System.out.print("Ingrese la temperatura máxima para " + dias[i] + ": ");
+            temperaturas[i] = scanner.nextDouble();
+        }
+        datosIngresados = true;
+    }
+
+    public static void mostrarTemperaturas() {
+        System.out.println("\n--- Temperaturas Registradas ---");
+        for (int i = 0; i < DIAS_SEMANA; i++) {
+            System.out.println(dias[i] + ": " + temperaturas[i] + " °C");
+        }
+    }
+
+    public static int obtenerIndiceTemperaturaMaxima(double[] arreglo) {
+        int indiceMax = 0;
+        for (int i = 1; i < arreglo.length; i++) {
+            if (arreglo[i] > arreglo[indiceMax]) {
+                indiceMax = i;
+            }
+        }
+        return indiceMax;
+    }
+
+    // Método sobrecargado 1
+    public static void mostrarMaxima(double temperatura) {
+        System.out.println("Temperatura máxima: " + temperatura + " °C");
+    }
+
+    // Método sobrecargado 2
+    public static void mostrarMaxima(double temperatura, String dia) {
+        System.out.println("Temperatura máxima: " + temperatura + " °C en " + dia);
+    }
+
+
+    public static double sumaTemperaturasRecursiva(double[] arreglo, int indice) {
+        if (indice >= arreglo.length) {
+            return 0;
+        }
+        return arreglo[indice] + sumaTemperaturasRecursiva(arreglo, indice + 1);
+    }
+}
