@@ -1,1 +1,253 @@
+//Earl Michael Frese Garcia 9941/23/19944
+
+import java.util.*;
+
+// ==== MODELOS BASE ====
+class Cliente {
+    private String nombre;
+
+    public Cliente(String nombre) {
+        this.nombre = nombre;
+    }
+
+    public String getNombre() {
+        return nombre;
+    }
+}
+
+class Paciente {
+    private String nombre;
+    private String especie;
+    private int edad;
+
+    public Paciente(String nombre, String especie, int edad) {
+        this.nombre = nombre;
+        this.especie = especie;
+        this.edad = edad;
+    }
+
+    public String getNombre() {
+        return nombre;
+    }
+
+    public String getEspecie() {
+        return especie;
+    }
+
+    public int getEdad() {
+        return edad;
+    }
+}
+
+// ==== ATENCIONES ====
+abstract class Atencion {
+    private Cliente cliente;
+    private Paciente paciente;
+    private Date fecha;
+    private double duracion; // minutos
+
+    public Atencion(Cliente cliente, Paciente paciente, Date fecha, double duracion) {
+        this.cliente = cliente;
+        this.paciente = paciente;
+        this.fecha = fecha;
+        this.duracion = duracion;
+    }
+
+    public final void procesarAtencion() {
+        registrarInicio();
+        realizarAtencion();
+        registrarFin();
+    }
+
+    protected abstract void realizarAtencion(); // Hook para Template Method
+
+    private void registrarInicio() {
+        System.out.println(">> Inicio de atención: " + new Date());
+    }
+
+    private void registrarFin() {
+        System.out.println(">> Fin de atención: " + new Date());
+    }
+
+    public Cliente getCliente() { return cliente; }
+    public Paciente getPaciente() { return paciente; }
+    public Date getFecha() { return fecha; }
+    public double getDuracion() { return duracion; }
+}
+
+class Consulta extends Atencion {
+    public Consulta(Cliente cliente, Paciente paciente, Date fecha, double duracion) {
+        super(cliente, paciente, fecha, duracion);
+    }
+
+    @Override
+    protected void realizarAtencion() {
+        System.out.println("Realizando consulta médica veterinaria...");
+    }
+}
+
+class Grooming extends Atencion {
+    public Grooming(Cliente cliente, Paciente paciente, Date fecha, double duracion) {
+        super(cliente, paciente, fecha, duracion);
+    }
+
+    @Override
+    protected void realizarAtencion() {
+        System.out.println("Realizando servicio de grooming...");
+    }
+}
+
+// ==== POLITICAS DE COBRO (Strategy) ====
+interface PoliticaCobro {
+    double calcularCosto(Atencion atencion);
+}
+
+class TarifaFija implements PoliticaCobro {
+    private double tarifa;
+
+    public TarifaFija(double tarifa) {
+        this.tarifa = tarifa;
+    }
+
+    public double calcularCosto(Atencion atencion) {
+        return tarifa;
+    }
+}
+
+class PorTiempo implements PoliticaCobro {
+    private double tarifaPorMinuto;
+
+    public PorTiempo(double tarifaPorMinuto) {
+        this.tarifaPorMinuto = tarifaPorMinuto;
+    }
+
+    public double calcularCosto(Atencion atencion) {
+        return atencion.getDuracion() * tarifaPorMinuto;
+    }
+}
+
+// ==== ESTADOS DE CITA (State Pattern) ====
+interface EstadoCita {
+    void avanzar(Cita cita);
+    String getNombre();
+}
+
+class Programada implements EstadoCita {
+    public void avanzar(Cita cita) {
+        cita.setEstado(new Confirmada());
+    }
+    public String getNombre() { return "Programada"; }
+}
+
+class Confirmada implements EstadoCita {
+    public void avanzar(Cita cita) {
+        cita.setEstado(new EnCurso());
+    }
+    public String getNombre() { return "Confirmada"; }
+}
+
+class EnCurso implements EstadoCita {
+    public void avanzar(Cita cita) {
+        cita.setEstado(new Finalizada());
+    }
+    public String getNombre() { return "En Curso"; }
+}
+
+class Finalizada implements EstadoCita {
+    public void avanzar(Cita cita) {
+        System.out.println("La cita ya está finalizada.");
+    }
+    public String getNombre() { return "Finalizada"; }
+}
+
+// ==== CITA ====
+class Cita {
+    private Atencion atencion;
+    private EstadoCita estado;
+    private Date fechaHora;
+
+    public Cita(Atencion atencion, Date fechaHora) {
+        this.atencion = atencion;
+        this.fechaHora = fechaHora;
+        this.estado = new Programada();
+    }
+
+    public void avanzarEstado() {
+        estado.avanzar(this);
+    }
+
+    public void setEstado(EstadoCita estado) {
+        this.estado = estado;
+    }
+
+    public String getEstadoNombre() {
+        return estado.getNombre();
+    }
+
+    public Atencion getAtencion() {
+        return atencion;
+    }
+
+    public Date getFechaHora() {
+        return fechaHora;
+    }
+}
+
+// ==== FABRICA DE ATENCIONES (Polimorfismo por sobrecarga) ====
+class FabricaAtencion {
+    public static Atencion crear(String tipo, Cliente cliente, Paciente paciente, Date fecha, double duracion) {
+        switch (tipo.toLowerCase()) {
+            case "consulta":
+                return new Consulta(cliente, paciente, fecha, duracion);
+            case "grooming":
+                return new Grooming(cliente, paciente, fecha, duracion);
+            default:
+                throw new IllegalArgumentException("Tipo de atención no válido.");
+        }
+    }
+}
+
+// ==== IA ====
+class IAHelper {
+    public static void saludar() {
+        System.out.println("Hola, soy la IA VETASISTENTE");
+    }
+}
+
+// ==== PROGRAMA PRINCIPAL ====
+public class ClinicaVeterinaria {
+    public static void main(String[] args) {
+        // Saludo IA
+        IAHelper.saludar();
+
+        // Crear cliente y paciente
+        Cliente cliente = new Cliente("Ana López");
+        Paciente mascota = new Paciente("Milo", "Gato", 2);
+
+        // Crear atención
+        Atencion atencion = FabricaAtencion.crear("consulta", cliente, mascota, new Date(), 30);
+
+        // Crear cita
+        Cita cita = new Cita(atencion, new Date());
+        System.out.println("\nEstado inicial de la cita: " + cita.getEstadoNombre());
+
+        // Avanzar estado
+        cita.avanzarEstado();
+        System.out.println("Estado tras confirmar: " + cita.getEstadoNombre());
+
+        cita.avanzarEstado();
+        System.out.println("Estado en curso: " + cita.getEstadoNombre());
+
+        // Procesar atención (Template Method)
+        atencion.procesarAtencion();
+
+        cita.avanzarEstado();
+        System.out.println("Estado final: " + cita.getEstadoNombre());
+
+        // Calcular costo
+        PoliticaCobro cobro = new PorTiempo(2.0); // Q2 por minuto
+        double total = cobro.calcularCosto(atencion);
+        System.out.println("\nCosto total de la atención: Q" + total);
+    }
+}
 
