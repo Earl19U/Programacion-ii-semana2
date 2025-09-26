@@ -1,1 +1,496 @@
+import java.util.*;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+
+/*juego por turnos como pokemon
+ *  - Nombre: Earl Michael Frese Garcia
+ *  - carnet: 9941-23-19944
+ */
+// nivel 1
+
+class InvalidChoiceException extends Exception {
+    // excepción para entradas inválidas del jugador
+    public InvalidChoiceException(String msg) { super(msg); }
+}
+
+class AttackMissedException extends Exception {
+    //excepción para cuando un ataque falla por precisión
+    public AttackMissedException(String msg) { super(msg); }
+}
+
+// =======================================================
+//  INTERFAZ FUNCIONAL PARA LAS REGLAS POR DAÑO
+// =======================================================
+@FunctionalInterface
+interface DamageRule {
+    //la regla que calcula el daño final
+    int computeDamage(Pokemon attacker, Pokemon defender, int baseDamage);
+}
+
+// =======================================================
+// CLASE ATTACK (ENTIDAD DE DOMINIO)
+// =======================================================
+class Attack {
+    private final String name;
+    private final double accuracy; // 0.0 - 1.0
+    private final int baseDamage;
+    private final DamageRule rule;
+    private final Random rnd = new Random();
+
+    // parte del constructor simple
+    public Attack(String name, double accuracy, int baseDamage, DamageRule rule) {
+        this.name = name;
+        this.accuracy = accuracy;
+        this.baseDamage = baseDamage;
+        this.rule = rule;
+    }
+
+    public String getName() { return name; }
+    public double getAccuracy() { return accuracy; }
+    public int getBaseDamage() { return baseDamage; }
+
+    // nivel 2 viene siendo ejecutar ataque, puede lanzar AttackMissedException
+    public int execute(Pokemon attacker, Pokemon defender) throws AttackMissedException {
+        double roll = rnd.nextDouble();
+        if (roll > accuracy) {
+            // nivel 2: datos sobre: atacar y fallar
+            throw new AttackMissedException(attacker.getSpecies() + " usó " + name + " y falló.");
+        }
+        // aplicar regla de daño
+        int dmg = rule.computeDamage(attacker, defender, baseDamage);
+        return Math.max(0, dmg);
+    }
+
+    @Override
+    public String toString() {
+        return String.format("%s (Acc: %.0f%%, Base: %d)", name, accuracy * 100, baseDamage);
+    }
+}
+
+// =======================================================
+// clase pokemon
+// =======================================================
+abstract class Pokemon {
+    protected String trainerName; // quien lo posee (Jugador/CPU o nombre real)
+    protected String species;     // Charmander, Squirtle, ...
+    protected int maxHp;
+    protected int currentHp;
+    protected int level;
+    protected final List<Attack> attacks = new ArrayList<>();
+
+    // la base
+    public Pokemon(String trainerName, String species, int maxHp, int level) {
+        this.trainerName = trainerName;
+        this.species = species;
+        this.maxHp = maxHp;
+        this.currentHp = maxHp;
+        this.level = level;
+    }
+
+    public String getName() { return trainerName + "'s " + species; }
+    public String getSpecies() { return species; }
+    public int getMaxHp() { return maxHp; }
+    public int getCurrentHp() { return currentHp; }
+    public boolean isFainted() { return currentHp <= 0; }
+    public List<Attack> getAttacks() { return Collections.unmodifiableList(attacks); }
+
+    // datos sobre recibir daño sin bajar de 0 de hp
+    public void receiveDamage(int dmg) {
+        currentHp = Math.max(0, currentHp - dmg);
+    }
+
+    // reiniciar el HP (si se necesita)
+    public void healFull() {
+        currentHp = maxHp;
+    }
+
+    // cada subclase define sus ataques
+    protected abstract void initAttacks();
+
+    @Override
+    public String toString() {
+        return String.format("%s (%s) HP: %d/%d", trainerName, species, currentHp, maxHp);
+    }
+}
+
+// =======================================================
+// las sublases concretwas que son las herencias
+// =======================================================
+
+class Charmander extends Pokemon {
+    public Charmander(String trainerName) {
+        super(trainerName, "Charmander", 80, 5);
+        initAttacks();
+    }
+
+    @Override
+    protected void initAttacks() {
+        // reglas con lambdas para daño según tipo de pokemon
+        DamageRule simple = (a, d, b) -> b + a.level * 2;
+        DamageRule fire = (a, d, b) -> {
+            int dmg = b + a.level * 3;
+            // NOVATO - nivel 3: ventaja contra Bulbasaur
+            if ("Bulbasaur".equalsIgnoreCase(d.getSpecies())) dmg *= 2;
+            return dmg;
+        };
+
+        attacks.add(new Attack("Arañazo", 0.95, 6, simple));
+        attacks.add(new Attack("Ascuas", 0.9, 10, fire));
+        attacks.add(new Attack("Llamarada", 0.7, 20, fire));
+    }
+}
+
+class Squirtle extends Pokemon {
+    public Squirtle(String trainerName) {
+        super(trainerName, "Squirtle", 90, 5);
+        initAttacks();
+    }
+
+    @Override
+    protected void initAttacks() {
+        DamageRule simple = (a, d, b) -> b + a.level * 2;
+        DamageRule water = (a, d, b) -> {
+            int dmg = b + a.level * 2;
+            // NOVATO - nivel 3: ventaja contra Charmander
+            if ("Charmander".equalsIgnoreCase(d.getSpecies())) dmg *= 2;
+            return dmg;
+        };
+
+        attacks.add(new Attack("Placaje", 0.95, 6, simple));
+        attacks.add(new Attack("Pistola de Agua", 0.9, 10, water));
+        attacks.add(new Attack("Hidrobomba", 0.65, 22, water));
+    }
+}
+
+class Bulbasaur extends Pokemon {
+    public Bulbasaur(String trainerName) {
+        super(trainerName, "Bulbasaur", 85, 5);
+        initAttacks();
+    }
+
+    @Override
+    protected void initAttacks() {
+        DamageRule simple = (a, d, b) -> b + a.level * 2;
+        DamageRule plant = (a, d, b) -> {
+            int dmg = b + a.level * 2;
+            // NOVATO - nivel 3: ventaja contra Squirtle
+            if ("Squirtle".equalsIgnoreCase(d.getSpecies())) dmg *= 2;
+            return dmg;
+        };
+
+        attacks.add(new Attack("Látigo Cepa", 0.95, 7, simple));
+        attacks.add(new Attack("Drenadoras", 0.9, 10, plant));
+        attacks.add(new Attack("Hoja Afilada", 0.75, 18, plant));
+    }
+}
+
+class Pikachu extends Pokemon {
+    public Pikachu(String trainerName) {
+        super(trainerName, "Pikachu", 75, 6);
+        initAttacks();
+    }
+
+    @Override
+    protected void initAttacks() {
+        DamageRule simple = (a, d, b) -> b + a.level * 2;
+        DamageRule electric = (a, d, b) -> b + a.level * 3;
+        // NOVATO - nivel 3: neutral vs tipos en esta versión simple
+
+        attacks.add(new Attack("Impactrueno", 0.9, 12, electric));
+        attacks.add(new Attack("Golpe", 0.95, 6, simple));
+        attacks.add(new Attack("Rayo", 0.7, 20, electric));
+    }
+}
+
+// =======================================================
+// CLASE PARA REGISTRAR EVENTOS DE DAÑO
+// =======================================================
+class DamageEvent {
+    public final String actor;     // "Jugador" o "CPU"
+    public final String attackName;
+    public final int damage;
+    public final boolean missed;
+
+    public DamageEvent(String actor, String attackName, int damage, boolean missed) {
+        this.actor = actor;
+        this.attackName = attackName;
+        this.damage = damage;
+        this.missed = missed;
+    }
+
+    @Override
+    public String toString() {
+        if (missed) return actor + ": " + attackName + " falló";
+        return actor + ": " + attackName + " hizo " + damage + " dmg";
+    }
+}
+
+// =======================================================
+// CLASE PRINCIPAL (GAME) - ORQUESTACIÓN
+// =======================================================
+public class Game {
+    // scanner y random compartidos
+    private static final Scanner scanner = new Scanner(System.in);
+    private static final Random random = new Random();
+
+    // POKEDEX usando Map<Integer, Supplier<Pokemon>>
+    private static final Map<Integer, Supplier<Pokemon>> POKEDEX = new LinkedHashMap<>();
+    static {
+        // supplier usa nombre temporal "Entrenador" (será reemplazado)
+        POKEDEX.put(1, () -> new Charmander("Entrenador"));
+        POKEDEX.put(2, () -> new Squirtle("Entrenador"));
+        POKEDEX.put(3, () -> new Bulbasaur("Entrenador"));
+        POKEDEX.put(4, () -> new Pikachu("Entrenador"));
+    }
+
+    public static void main(String[] args) {
+        //Mostrar encabezado y datos del alumno para evidencia
+        System.out.println("========================================");
+        System.out.println("Alumno: Earl Michael Frese Garcia");
+        System.out.println("ID: 9941-23-19944");
+        System.out.println("Mini-Juego Pokémon - Consola");
+        System.out.println("========================================\n");
+
+        // Requerimiento funcional: debe pedir nombre del jugador
+        System.out.print("Ingresa tu nombre (se usará como identificador): ");
+        String playerName = scanner.nextLine().trim();
+        if (playerName.isEmpty()) playerName = "Jugador";
+
+        // Eleccion del Pokémon
+        Pokemon player;
+        Pokemon cpu;
+        try {
+            player = choosePokemon(playerName);
+            cpu = chooseCpuPokemon(player.getClass(), "CPU");
+        } catch (InvalidChoiceException e) {
+            System.err.println("Error en selección: " + e.getMessage());
+            return;
+        }
+
+        // ajustar trainerName visibles
+        player.trainerName = playerName;
+        cpu.trainerName = "CPU";
+
+        System.out.println();
+        System.out.println("Has elegido: " + player.getSpecies());
+        System.out.println("La CPU eligió: " + cpu.getSpecies());
+        System.out.println();
+
+        // Logs y listas requeridas
+        List<String> briefLog = new ArrayList<>();          // requerimiento: log de batalla (List)
+        List<DamageEvent> damageHistory = new ArrayList<>(); // requerimiento: historial de daño (List)
+
+        // Bucle de turnos: jugador inicia
+        boolean playerTurn = true;
+
+        // Mientras ninguno esté debilitado
+        while (!player.isFainted() && !cpu.isFainted()) {
+            if (playerTurn) {
+                // Turno del jugador
+                System.out.println("\n--- Tu turno ---");
+                System.out.println(player);
+                System.out.println(cpu);
+                System.out.println();
+
+                try {
+                    Attack chosen = chooseAttack(player); // puede lanzar InvalidChoiceException
+                    try {
+                        int dmg = chosen.execute(player, cpu);
+                        cpu.receiveDamage(dmg);
+                        String event = playerName + " usa " + chosen.getName() + " y hace " + dmg + " daño.";
+                        System.out.println(event);
+                        briefLog.add(event);
+                        damageHistory.add(new DamageEvent("Jugador", chosen.getName(), dmg, false));
+                    } catch (AttackMissedException ame) {
+                        String event = playerName + " usa " + chosen.getName() + " y falla.";
+                        System.out.println(event);
+                        briefLog.add(event);
+                        damageHistory.add(new DamageEvent("Jugador", chosen.getName(), 0, true));
+                    }
+                } catch (InvalidChoiceException ice) {
+                    // Manejo de entrada inválida: perder turno
+                    String event = "Jugador realizó una elección inválida y pierde el turno.";
+                    System.out.println(event);
+                    briefLog.add(event);
+                    damageHistory.add(new DamageEvent("Jugador", "Elección inválida", 0, true));
+                }
+
+            } else {
+                // Turno de la CPU
+                System.out.println("\n--- Turno CPU ---");
+                System.out.println(player);
+                System.out.println(cpu);
+                System.out.println();
+
+                Attack cpuAttack = selectCpuAttack(cpu); // estrategia simple: prioriza precisión
+                try {
+                    int dmg = cpuAttack.execute(cpu, player);
+                    player.receiveDamage(dmg);
+                    String event = "CPU usa " + cpuAttack.getName() + " y hace " + dmg + " daño.";
+                    System.out.println(event);
+                    briefLog.add(event);
+                    damageHistory.add(new DamageEvent("CPU", cpuAttack.getName(), dmg, false));
+                } catch (AttackMissedException ame) {
+                    String event = "CPU usa " + cpuAttack.getName() + " y falla.";
+                    System.out.println(event);
+                    briefLog.add(event);
+                    damageHistory.add(new DamageEvent("CPU", cpuAttack.getName(), 0, true));
+                }
+            }
+
+            // Mostrar HP después de las acciones
+            System.out.println();
+            System.out.println("HP actuales:");
+            System.out.println(player);
+            System.out.println(cpu);
+            System.out.println("--------------------------------------------------");
+
+            // Alternar turno
+            playerTurn = !playerTurn;
+        }
+
+        // Resultado final
+        System.out.println();
+        if (player.isFainted() && cpu.isFainted()) {
+            System.out.println("¡Empate! Ambos se debilitaron.");
+            briefLog.add("Resultado: Empate");
+        } else if (cpu.isFainted()) {
+            System.out.println("¡Ganaste! La CPU se debilitó.");
+            briefLog.add("Resultado: Jugador gana");
+        } else {
+            System.out.println("Perdiste. Tu Pokémon se debilitó.");
+            briefLog.add("Resultado: CPU gana");
+        }
+
+        // Resumen y estadísticas con Streams
+        System.out.println("\n=== RESUMEN DE LA BATALLA ===");
+        System.out.println("Eventos clave:");
+        briefLog.forEach(System.out::println);
+
+        System.out.println("\nEstadísticas (calculadas con Streams y lambdas):");
+
+        // Total de fallos
+        long totalMisses = damageHistory.stream().filter(e -> e.missed).count();
+        System.out.println("Total de fallos: " + totalMisses);
+
+        // Top 3 golpes más fuertes
+        List<DamageEvent> top3 = damageHistory.stream()
+                .filter(e -> !e.missed && e.damage > 0)
+                .sorted(Comparator.comparingInt((DamageEvent e) -> e.damage).reversed())
+                .limit(3)
+                .collect(Collectors.toList());
+
+        System.out.println("Top 3 golpes más fuertes:");
+        if (top3.isEmpty()) {
+            System.out.println("  Ningún golpe acertado.");
+        } else {
+            top3.forEach(e -> System.out.println("  " + e.attackName + " por " + e.actor + " -> " + e.damage + " dmg"));
+        }
+
+        // Promedio de daño (solo golpes acertados)
+        OptionalDouble avgDamage = damageHistory.stream()
+                .filter(e -> !e.missed && e.damage > 0)
+                .mapToInt(e -> e.damage)
+                .average();
+        System.out.println("Promedio de daño (golpes acertados): " + (avgDamage.isPresent() ? String.format("%.2f", avgDamage.getAsDouble()) : "N/A"));
+
+        // Conteo de eventos por actor (Jugador/CPU)
+        Map<String, Long> countsByActor = damageHistory.stream()
+                .collect(Collectors.groupingBy(e -> e.actor, Collectors.counting()));
+        System.out.println("Conteo de eventos por actor:");
+        countsByActor.forEach((k, v) -> System.out.println("  " + k + ": " + v));
+
+        // Daño total por actor
+        Map<String, Integer> totalDamageByActor = damageHistory.stream()
+                .filter(e -> !e.missed)
+                .collect(Collectors.groupingBy(e -> e.actor, Collectors.summingInt(e -> e.damage)));
+        System.out.println("Daño total por actor:");
+        totalDamageByActor.forEach((k, v) -> System.out.println("  " + k + ": " + v));
+
+        System.out.println("\nFin del resumen. Gracias por jugar.");
+    }
+
+    // =======================================================
+    // MÉTODOS AUXILIARES (elegir pokemon, ataques, CPU, y demas.)
+    // =======================================================
+
+    // elegir pokemon por número con validación
+    private static Pokemon choosePokemon(String playerName) throws InvalidChoiceException {
+        System.out.println("Elige tu Pokémon:");
+        POKEDEX.forEach((k, supplier) -> {
+            Pokemon tmp = supplier.get();
+            System.out.printf("%d) %s\n", k, tmp.getSpecies());
+        });
+
+        System.out.print("Ingrese número de tu elección: ");
+        String input = scanner.nextLine().trim();
+        int choice;
+        try {
+            choice = Integer.parseInt(input);
+        } catch (NumberFormatException e) {
+            throw new InvalidChoiceException("No ingresaste un número válido.");
+        }
+
+        Supplier<Pokemon> sup = POKEDEX.get(choice);
+        if (sup == null) throw new InvalidChoiceException("Opción fuera de rango.");
+
+        // Crear instancia real con nombre del jugador
+        switch (choice) {
+            case 1: return new Charmander(playerName);
+            case 2: return new Squirtle(playerName);
+            case 3: return new Bulbasaur(playerName);
+            case 4: return new Pikachu(playerName);
+            default: throw new InvalidChoiceException("Opción desconocida.");
+        }
+    }
+
+    // CPU elige distinto
+    private static Pokemon chooseCpuPokemon(Class<? extends Pokemon> playerClass, String cpuName) throws InvalidChoiceException {
+        List<Integer> keys = new ArrayList<>(POKEDEX.keySet());
+        List<Integer> available = new ArrayList<>();
+        for (Integer k : keys) {
+            Pokemon temp = POKEDEX.get(k).get();
+            if (!temp.getClass().equals(playerClass)) available.add(k);
+        }
+        if (available.isEmpty()) throw new InvalidChoiceException("No hay pokemons disponibles para la CPU.");
+        int pick = available.get(random.nextInt(available.size()));
+        switch (pick) {
+            case 1: return new Charmander(cpuName);
+            case 2: return new Squirtle(cpuName);
+            case 3: return new Bulbasaur(cpuName);
+            case 4: return new Pikachu(cpuName);
+            default: throw new InvalidChoiceException("Opción CPU inválida.");
+        }
+    }
+
+    // muestra ataques ordenados con Streams y lee la selección
+    private static Attack chooseAttack(Pokemon player) throws InvalidChoiceException {
+        List<Attack> sorted = player.getAttacks().stream()
+                .sorted(Comparator.comparing(Attack::getName))
+                .collect(Collectors.toList());
+
+        System.out.println("Elige un ataque:");
+        for (int i = 0; i < sorted.size(); i++) {
+            System.out.printf("%d) %s\n", i + 1, sorted.get(i));
+        }
+        System.out.print("Número de ataque: ");
+        String input = scanner.nextLine().trim();
+        int choice;
+        try {
+            choice = Integer.parseInt(input);
+        } catch (NumberFormatException e) {
+            throw new InvalidChoiceException("Entrada no es un número.");
+        }
+        if (choice < 1 || choice > sorted.size()) throw new InvalidChoiceException("Índice fuera de rango.");
+        return sorted.get(choice - 1);
+    }
+
+    // CPU selecciona ataque priorizando precisión
+    private static Attack selectCpuAttack(Pokemon cpu) {
+        return cpu.getAttacks().stream()
+                .sorted(Comparator.comparingDouble(Attack::getAccuracy).reversed())
+                .findFirst()
+                .orElse(cpu.getAttacks().get(0));
+    }
+}
 
